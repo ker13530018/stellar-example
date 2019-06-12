@@ -1,8 +1,38 @@
 import { redis } from '../redis'
 import StellarSdk from 'stellar-sdk'
+// import Promise from 'bluebird'
 
 const server = new StellarSdk.Server('https://horizon-testnet.stellar.org')
 StellarSdk.Network.useTestNetwork()
+
+export const users = async (req, res) => {
+  let next = '0'
+  let users = []
+  do {
+    const result = await redis.scanAsync(parseInt(next), 'MATCH', 'user:*')
+    next = result[0]
+    const data = result[1]
+
+    let tasks = []
+    if (data && Array.isArray(data)) {
+      data.forEach(key => {
+        tasks.push(redis.getAsync(key))
+      })
+    }
+
+    const _result = await Promise.all(tasks)
+    const _users = _result.map(item => {
+      return JSON.parse(item)
+    })
+
+    users = [...users, ..._users]
+  } while (parseInt(next) != 0)
+
+  res.json({
+    message: 'get users success',
+    data: users,
+  })
+}
 
 export const createUser = async (req, res) => {
   const { username } = req.body
@@ -21,6 +51,7 @@ export const createUser = async (req, res) => {
 
   const keypair = StellarSdk.Keypair.random()
   const user = {
+    username,
     publicKey: keypair.publicKey(),
     secretKey: keypair.secret(),
     wallet: false,
