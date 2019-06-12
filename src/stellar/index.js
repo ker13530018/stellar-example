@@ -3,7 +3,7 @@ const router = express.Router()
 
 // internal
 import { createUser, getBalances } from './user'
-import { createWallet } from './createWallet'
+import { createWallet } from './wallet'
 
 router.post('/users', createUser)
 router.get('/users/:username/balances', getBalances)
