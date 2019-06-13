@@ -1,11 +1,15 @@
-import { redis } from '../redis'
 import axios from 'axios'
+import redis from '../redis'
+
+import config from '../config'
+
+const { server } = config
 
 export const createWallet = async (req, res) => {
   const { username } = req.body
   if (!username) {
     return res.status(404).json({
-      message: `Username field is required`,
+      message: 'Username field is required',
     })
   }
 
@@ -15,7 +19,6 @@ export const createWallet = async (req, res) => {
       message: `Username ${username} not found`,
     })
   }
-  console.log('user data', data)
   let user = JSON.parse(data)
 
   const { wallet, publicKey } = user
@@ -24,13 +27,10 @@ export const createWallet = async (req, res) => {
       message: `Username ${username} is already has wallet`,
     })
   }
-  console.log('user info', user)
   //
   let result = {}
   try {
-    const url = `https://friendbot.stellar.org?addr=${encodeURIComponent(
-      publicKey,
-    )}`
+    const url = `https://friendbot.stellar.org?addr=${encodeURIComponent(publicKey)}`
     result = await axios.get(url)
   } catch (e) {
     return res.json({
@@ -45,7 +45,7 @@ export const createWallet = async (req, res) => {
     })
   }
 
-  const stellarResponse = result.data
+  const { data: stellarResponse } = result
 
   user = { ...user, wallet: true, ...stellarResponse }
   await redis.setAsync(`user:${username}`, JSON.stringify(user))
@@ -55,3 +55,5 @@ export const createWallet = async (req, res) => {
     data: user,
   })
 }
+
+export const transfer = (req, res) => {}

@@ -1,14 +1,18 @@
 import express from 'express'
-const router = express.Router()
 
 // internal
 import { users, createUser, getBalances } from './user'
 import { createWallet } from './wallet'
 
+const router = express.Router()
+//
+// user group
 router.get('/users', users)
 router.post('/users', createUser)
-router.get('/users/:username/balances', getBalances)
+router.get('/users/:users/balances', getBalances)
 
+//
+// wallet group
 router.post('/wallets', createWallet)
 
 export default router
