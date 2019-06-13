@@ -2,7 +2,7 @@ import express from 'express'
 
 // internal
 import { users, createUser, getBalances } from './user'
-import { createWallet } from './wallet'
+import { createWallet, transfers } from './wallet'
 
 const router = express.Router()
 //
@@ -14,5 +14,5 @@ router.get('/users/:users/balances', getBalances)
 //
 // wallet group
 router.post('/wallets', createWallet)
-
+router.post('/wallets/:wallets/transfers', transfers)
 export default router
