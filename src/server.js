@@ -1,7 +1,6 @@
 import express from 'express'
 import bodyParser from 'body-parser'
 import stellarRouter from './stellar'
-import '@babel/polyfill'
 
 const app = express()
 const port = process.env.PORT || 3000
