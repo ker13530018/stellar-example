@@ -54,7 +54,8 @@ export const addTrustUserAsync = async (username, asset) => {
     assets.push(asset)
   }
   const newData = { ...user, assets }
-  await redis.setAsync(`user:${username}`, JSON.stringify(newData))
+  const result = await redis.setAsync(`user:${username}`, JSON.stringify(newData))
+  return result
 }
 
 export const setAssetAsync = (asset, publicKey) => redis.setAsync(`asset:${asset}`, publicKey)

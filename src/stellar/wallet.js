@@ -87,6 +87,9 @@ export const transfers = async (req, res) => {
   const { publicKey, secretKey } = user
   // TODO : dynamic asset code and change
   let myAsset = StellarSdk.Asset.native()
+
+  const tasks = []
+
   if (asset !== 'XLM' && asset !== 'native') {
     const issuerPublicKey = await getAssetAsync(asset)
 
@@ -94,7 +97,7 @@ export const transfers = async (req, res) => {
 
     // check trust target account
     const trusted = await checkTrustUserAsync(target, asset)
-    console.log('trusted', trusted)
+
     if (!trusted) {
       const requestAccount = await server.loadAccount(targetAccount.publicKey)
       const trustTransaction = new StellarSdk.TransactionBuilder(requestAccount, {
@@ -109,16 +112,10 @@ export const transfers = async (req, res) => {
         .build()
 
       trustTransaction.sign(StellarSdk.Keypair.fromSecret(targetAccount.secretKey))
-      try {
-        await server.submitTransaction(trustTransaction)
-        await addTrustUserAsync(target, asset)
-        console.log('change trusted success')
-      } catch (e) {
-        return res.status(500).json({
-          message: 'Change trust error',
-          data: e,
-        })
-      }
+      // Add send change trust
+      tasks.push(server.submitTransaction(trustTransaction))
+      // Add save trust asset to user data
+      tasks.push(addTrustUserAsync(target, asset))
     }
   }
 
@@ -137,12 +134,13 @@ export const transfers = async (req, res) => {
     .build()
 
   transaction.sign(StellarSdk.Keypair.fromSecret(secretKey))
-
+  // Add send payment transaction task
+  tasks.push(server.submitTransaction(transaction))
   try {
-    const transactionResult = await server.submitTransaction(transaction)
+    const result = await Promise.all(tasks)
     return res.json({
       message: 'Transfer success',
-      data: transactionResult,
+      data: result,
     })
   } catch (e) {
     return res.json({
