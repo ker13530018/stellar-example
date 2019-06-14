@@ -1,5 +1,7 @@
 import StellarSdk from 'stellar-sdk'
-import redis from '../redis'
+import {
+  redis, getUserAsync, setUserAsync, checkExistsAsync,
+} from '../redis'
 import config from '../config'
 
 const { server } = config
@@ -40,8 +42,7 @@ export const createUser = async (req, res) => {
     })
   }
 
-  const exists = await redis.existsAsync(`user:${username}`)
-  if (exists && exists > 0) {
+  if (await checkExistsAsync(username)) {
     return res.json({
       message: `Username ${username} is already exists`,
     })
@@ -55,7 +56,7 @@ export const createUser = async (req, res) => {
     wallet: false,
   }
 
-  const result = await redis.setAsync(`user:${username}`, JSON.stringify(user))
+  const result = await setUserAsync(username, user)
   if (!result) {
     return res.status(500).json({
       message: `Create ${username} error`,
@@ -75,20 +76,21 @@ export const getBalances = async (req, res) => {
     })
   }
 
-  const userString = await redis.getAsync(`user:${username}`)
-  if (!userString) {
+  const user = await getUserAsync(username)
+  if (!user) {
     return res.json({
       message: `Username ${username} not found`,
     })
   }
 
-  const user = JSON.parse(userString)
   const { publicKey } = user
   const account = await server.loadAccount(publicKey)
 
   const { balances } = account
+
   const data = balances.map(item => ({
     type: item.asset_type,
+    code: item.asset_code || 'XLM',
     balance: parseFloat(item.balance),
   }))
 

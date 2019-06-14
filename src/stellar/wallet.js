@@ -1,6 +1,12 @@
 import axios from 'axios'
 import StellarSdk from 'stellar-sdk'
-import redis from '../redis'
+import {
+  getAssetAsync,
+  getUserAsync,
+  setUserAsync,
+  checkTrustUserAsync,
+  addTrustUserAsync,
+} from '../redis'
 
 import config from '../config'
 
@@ -14,13 +20,12 @@ export const createWallet = async (req, res) => {
     })
   }
 
-  const data = await redis.getAsync(`user:${username}`)
-  if (!data) {
+  const user = await getUserAsync(username)
+  if (!user) {
     return res.json({
       message: `Username ${username} not found`,
     })
   }
-  let user = JSON.parse(data)
 
   const { wallet, publicKey } = user
   if (wallet) {
@@ -48,38 +53,74 @@ export const createWallet = async (req, res) => {
 
   const { data: stellarResponse } = result
 
-  user = { ...user, wallet: true, ...stellarResponse }
-  await redis.setAsync(`user:${username}`, JSON.stringify(user))
+  const newUser = { ...user, wallet: true, ...stellarResponse }
+  const updated = await setUserAsync(username, newUser)
+  if (!updated) {
+    return res.status(500).json({
+      message: `Create ${username} fail`,
+    })
+  }
 
   return res.json({
     message: `Create ${username} success`,
-    data: user,
+    data: newUser,
   })
 }
 
 export const transfers = async (req, res) => {
   const { wallets: username } = req.params
-  const { target, amount, type } = req.body
-  console.log('amount', amount)
-  const data = await redis.getAsync(`user:${username}`)
-  if (!data) {
+  const { target, amount, asset } = req.body
+  const user = await getUserAsync(username)
+  if (!user) {
     return res.json({
       message: `Username ${username} not found`,
     })
   }
-  const user = JSON.parse(data)
 
-  if (!target) {
+  const targetAccount = await getUserAsync(target)
+  if (!targetAccount) {
     return res.json({
       message: `Username target ${username} is required`,
     })
   }
-  const targetStr = await redis.getAsync(`user:${target}`)
-  const targetAccount = JSON.parse(targetStr)
 
   const { publicKey, secretKey } = user
-  // TODO : dynamic type
-  // console.log('type', type)
+  // TODO : dynamic asset code and change
+  let myAsset = StellarSdk.Asset.native()
+  if (asset !== 'XLM' && asset !== 'native') {
+    const issuerPublicKey = await getAssetAsync(asset)
+
+    myAsset = new StellarSdk.Asset(asset, issuerPublicKey)
+
+    // check trust target account
+    const trusted = await checkTrustUserAsync(target, asset)
+    console.log('trusted', trusted)
+    if (!trusted) {
+      const requestAccount = await server.loadAccount(targetAccount.publicKey)
+      const trustTransaction = new StellarSdk.TransactionBuilder(requestAccount, {
+        fee: StellarSdk.BASE_FEE,
+      })
+        .addOperation(
+          StellarSdk.Operation.changeTrust({
+            asset: myAsset,
+          }),
+        )
+        .setTimeout(30)
+        .build()
+
+      trustTransaction.sign(StellarSdk.Keypair.fromSecret(targetAccount.secretKey))
+      try {
+        await server.submitTransaction(trustTransaction)
+        await addTrustUserAsync(target, asset)
+        console.log('change trusted success')
+      } catch (e) {
+        return res.status(500).json({
+          message: 'Change trust error',
+          data: e,
+        })
+      }
+    }
+  }
 
   const account = await server.loadAccount(publicKey)
   const transaction = new StellarSdk.TransactionBuilder(account, {
@@ -88,7 +129,7 @@ export const transfers = async (req, res) => {
     .addOperation(
       StellarSdk.Operation.payment({
         destination: targetAccount.publicKey,
-        asset: StellarSdk.Asset.native(),
+        asset: myAsset,
         amount: `${amount}`,
       }),
     )
