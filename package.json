@@ -22,7 +22,7 @@
     "querystring": "^0.2.0",
     "redis": "^2.8.0",
     "rimraf": "^2.6.3",
-    "stellar-sdk": "^1.0.2"
+    "stellar-sdk": "^8.2.3"
   },
   "devDependencies": {
     "@babel/cli": "^7.4.4",
